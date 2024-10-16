@@ -17,7 +17,7 @@ const paymentController=require('./services/paymentService.js'
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cors = require('cors');
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 const port = process.env.PORT || 4000;
 const uri = "mongodb+srv://rawat009111:fSQGtHMkkia3YhjZ@tours.qpddv9d.mongodb.net/?retryWrites=true&w=majority";
 const mongoose = require('mongoose');
@@ -25,7 +25,7 @@ require('dotenv').config();
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: 653316676446441,
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
@@ -35,6 +35,12 @@ const storage = new CloudinaryStorage({
   params: {
     folder: 'tours', // Cloudinary folder name
     allowed_formats: ['jpg', 'png', 'jpeg'], // Allowed formats
+    transformation: [
+      {
+        quality: 'auto:low', // Automatically compress images with low quality
+        fetch_format: 'auto', // Convert to the best format based on user device
+      },
+    ],
   },
 });
 
