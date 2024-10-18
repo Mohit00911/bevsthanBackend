@@ -22,8 +22,8 @@ const port = process.env.PORT || 4000;
 const uri = "mongodb+srv://rawat009111:fSQGtHMkkia3YhjZ@tours.qpddv9d.mongodb.net/?retryWrites=true&w=majority";
 const mongoose = require('mongoose');
 require('dotenv').config();
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use(bodyParser.json({ limit: '70mb' }));
+app.use(bodyParser.urlencoded({ limit: '70mb', extended: true }));
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
