@@ -11,37 +11,13 @@ const cloudinary = require('cloudinary').v2;
 app.use(express.json());
 
 
-// const imageUpload = async (req, res) => {
-//   try {
-//     const storage = multer.diskStorage({
-//       destination: (req, file, cb) => {
-//         cb(null, 'uploads/');
-//         console.log(file)
-//       },
-//       filename: (req, file, cb) => {
-//         cb(null, Date.now() + '-' + file.originalname);
-//       },
-//     });
-    
-//     const upload = multer({ storage });
-
-//   } catch (error) {
-//     console.error("Error uploading image:", error);
-//     res.status(500).json({ error: "Failed to upload image" });
-//   }
-// }
-
-// Set up multer storage
-
-
-// Create tour function
 const createTour = async (req, res) => {
   try {
     console.log("Request Body:", req.body);
-    console.log("Request Files:", req.files);
 
     // Extracting tour data from request body
     const {
+      uuid,
       name,
       overview,
       location,
@@ -88,10 +64,7 @@ const createTour = async (req, res) => {
       }
       return uploadedPhotoUrls;
     };
-    console.log("Standard Site Seen Photos:", req.files.standardSiteSeenPhotos);
 
-
-    // Process itineraries and upload photos
     // Process itineraries and upload photos
     const processItineraries = async (itineraries, siteSeenPhotoFiles) => {
       return Promise.all(itineraries.map(async (itinerary, index) => {
@@ -99,24 +72,19 @@ const createTour = async (req, res) => {
         
         // If siteSeenPhotoFiles exists for the current itinerary
         if (siteSeenPhotoFiles && siteSeenPhotoFiles[index]) {
-          // Ensure we're treating this as an array
           const files = Array.isArray(siteSeenPhotoFiles[index]) ? siteSeenPhotoFiles[index] : [siteSeenPhotoFiles[index]];
-          
-          // Upload the photos and get URLs
           siteSeenPhotosUrls = await uploadSiteSeenPhotos(files);
         }
     
-        // Combine existing site seen photos with newly uploaded ones
         return {
           ...itinerary,
           siteSeenPhotos: [
-            ...(Array.isArray(itinerary.siteSeenPhotos) ? itinerary.siteSeenPhotos : []), // Existing photos
-            ...siteSeenPhotosUrls // New uploaded photos
-          ].filter(url => typeof url === 'string' && url.trim() !== ''), // Filter out invalid URLs
+            ...(Array.isArray(itinerary.siteSeenPhotos) ? itinerary.siteSeenPhotos : []),
+            ...siteSeenPhotosUrls
+          ].filter(url => typeof url === 'string' && url.trim() !== ''),
         };
       }));
     };
-    
     
     let imageUrls = [];
     if (req.files?.images) {
@@ -159,41 +127,86 @@ const createTour = async (req, res) => {
       ...JSON.parse(premiumDetails),
       itineraries: premiumItineraries,
     };
-    console.log("Standard Itineraries:", standardItineraries);
-    console.log("Deluxe Itineraries:", deluxeItineraries);
-    // Create and save the tour
-    const newTour = new Tour({
-      name,
-      overview,
-      location,
-      duration,
-      groupSize,
-      cancellationPolicy,
-      transportation: transportation === 'true', // Ensure transportation is stored as a boolean
-      availableDates,
-      languages: Array.isArray(languages) ? languages : [languages],
-      departureDetails,
-      additionalInfo: Array.isArray(additionalInfo) ? additionalInfo : [additionalInfo],
-      bannerImage: bannerImageUrl,
-      images: imageUrls,
-      standardDetails: updatedStandardDetails,
-      deluxeDetails: updatedDeluxeDetails,
-      premiumDetails: updatedPremiumDetails,
-      knowBeforeYouGo: Array.isArray(knowBeforeYouGo) ? knowBeforeYouGo : [knowBeforeYouGo],
-      // fixedDates: JSON.parse(fixedDates),
-      // openHours: JSON.parse(openHours),
-    });
+   
+    // Check if the tour already exists using the UUID
+    let tour = await Tour.findOne({ uuid });
 
-    const savedTour = await newTour.save();
+    if (tour) {
+      // If the tour exists, update the existing tour
+      tour.name = name;
+      tour.overview = overview;
+      tour.location = location;
+      tour.duration = duration;
+      tour.groupSize = groupSize;
+      tour.cancellationPolicy = cancellationPolicy;
+      tour.transportation = transportation === 'true';
+      tour.availableDates = availableDates;
+      tour.languages = Array.isArray(languages) ? languages : [languages];
+      tour.departureDetails = departureDetails;
+      tour.additionalInfo = Array.isArray(additionalInfo) ? additionalInfo : [additionalInfo];
+      tour.bannerImage = bannerImageUrl || tour.bannerImage; // Only update if a new image is uploaded
+      tour.images = imageUrls.length > 0 ? imageUrls : tour.images; // Update images only if new ones are provided
+      tour.standardDetails = updatedStandardDetails;
+      tour.deluxeDetails = updatedDeluxeDetails;
+      tour.premiumDetails = updatedPremiumDetails;
+      tour.knowBeforeYouGo = Array.isArray(knowBeforeYouGo) ? knowBeforeYouGo : [knowBeforeYouGo];
+      tour.fixedDates = fixedDates;
+      tour.openHours = openHours;
 
-    // Respond with the saved tour data
-    res.status(201).json(savedTour);
+      const updatedTour = await tour.save(); // Save the updated tour
+      return res.status(200).json(updatedTour);
+    } else {
+      // Create a new tour if it does not exist
+      const newTour = new Tour({
+        uuid,
+        name,
+        overview,
+        location,
+        duration,
+        groupSize,
+        cancellationPolicy,
+        transportation: transportation === 'true',
+        availableDates,
+        languages: Array.isArray(languages) ? languages : [languages],
+        departureDetails,
+        additionalInfo: Array.isArray(additionalInfo) ? additionalInfo : [additionalInfo],
+        bannerImage: bannerImageUrl,
+        images: imageUrls,
+        standardDetails: updatedStandardDetails,
+        deluxeDetails: updatedDeluxeDetails,
+        premiumDetails: updatedPremiumDetails,
+        knowBeforeYouGo: Array.isArray(knowBeforeYouGo) ? knowBeforeYouGo : [knowBeforeYouGo],
+        fixedDates: fixedDates,
+        openHours: openHours,
+      });
+
+      const savedTour = await newTour.save(); // Save the new tour
+      return res.status(201).json(savedTour);
+    }
   } catch (error) {
     console.error('Error creating/updating tour:', error);
     res.status(500).json({ error: 'Internal Server Error', details: error });
   }
 };
 
+const deleteTour = async (req, res) => {
+  try {
+    const { uuid } = req.params; // Get UUID from request parameters
+console.log(uuid)
+    // Check if the tour exists
+    const deletedTour = await Tour.findOneAndDelete({ uuid });
+
+    if (!deletedTour) {
+      return res.status(404).json({ error: 'Tour not found' });
+    }
+
+    // Respond with a success message
+    res.status(200).json({ message: 'Tour deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting tour:', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error });
+  }
+};
 
 
 const getAllTours = async (req, res) => {
@@ -397,6 +410,7 @@ module.exports = {
   getToursForVendor,
   getTourDetails,
   updateTour,
+  deleteTour,
   // getToursByLocationDate,
   getToursByFilter,
   // imageUpload

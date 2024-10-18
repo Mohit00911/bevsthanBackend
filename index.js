@@ -29,6 +29,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+
 mongoose.connect(uri, { });
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
@@ -66,6 +67,9 @@ app.post('/api/createTours',upload.fields([
   { name: 'deluxeSiteSeenPhotos', maxCount: 10 },
   { name: 'premiumSiteSeenPhotos', maxCount: 10 }
 ]), tourController.createTour);
+app.delete('/api/deleteTour/:uuid', tourController.deleteTour);
+
+
 app.post('/api/updateUser',authRouter.updateUser)
 app.post('/api/getUser',authRouter.getUser)
 app.post('/api/contactus', contactUs.submitContactForm);
