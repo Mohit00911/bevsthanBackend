@@ -1,6 +1,6 @@
 const User = require("../models/users.js");
 const Vendor = require("../models/vendors.js");
-
+const bcrypt = require("bcryptjs")
 const otpGenerator = require("otp-generator");
 const twilio = require("twilio");
 const crypto = require("crypto-js");
@@ -10,13 +10,101 @@ configDotenv();
 const generateToken = (userId) => {
   return jwt.sign({ userId }, "okjnlk", { expiresIn: "1h" });
 };
-const comparePasswords = (inputPassword, hashedPassword) => {
-  // Hash the input password using the same algorithm and compare with the stored hashed password
-  const hashedInputPassword = crypto
-    .SHA256(inputPassword)
-    .toString(crypto.enc.Hex);
-  return hashedInputPassword === hashedPassword;
+
+const vendorLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check if email exists
+    const existingVendor = await Vendor.findOne({ email });
+    if (!existingVendor) {
+      return res.status(400).json({ message: "Vendor not found. Please sign up." });
+    }
+
+    // Validate password
+    const isPasswordValid = await bcrypt.compare(password, existingVendor.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Invalid email or password." });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: existingVendor._id, email: existingVendor.email },
+      process.env.JWT_SECRET, // Ensure you have a secret in your .env file
+      { expiresIn: "1h" } // Token expires in 1 hour
+    );
+
+    // Send the response with the token
+    res.status(200).json({
+      message: "Login successful",
+      token, // Return the JWT token
+      vendor: {
+        id: existingVendor._id,
+        email: existingVendor.email,
+        firstName: existingVendor.firstName,
+        lastName: existingVendor.lastName,
+        verified: existingVendor.verified
+      },
+    });
+  } catch (error) {
+    console.error("Error during login:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
+
+const vendorSignup = async (req, res) => {
+  try {
+    const {
+     
+      confirmPassword,
+      email,
+      firstName,
+      lastName,
+      password,
+      phone,
+      verified
+    } = req.body;
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match" });
+    }
+    const existingUser = await Vendor.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User with this email already exists" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create the new user/vendor
+    const newUser = new Vendor({
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+      phone,
+      verified
+    });
+
+    const savedUser = await newUser.save();
+
+    // Generate a JWT
+    const token = jwt.sign(
+      { userId: savedUser._id}, // Payload
+      process.env.JWT_SECRET, // Secret key
+      { expiresIn: "1h" } // Token expiry
+    );
+
+    // Send the response with the token
+    res.status(201).json({
+      message: "User created successfully",
+      user: savedUser,
+      token, // Include token in the response
+    });
+  } catch (error) {
+    console.error("Error signing up:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 
 const signup = async (req, res) => {
   try {
@@ -186,5 +274,7 @@ module.exports = {
   signup,
   login,
   updateUser,
-  getUser
+  getUser,
+  vendorSignup,
+  vendorLogin
 };

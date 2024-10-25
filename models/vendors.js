@@ -9,6 +9,10 @@ const vendorSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  verified: {
+    type: Boolean,
+    default: false
+  },
   email: {
     type: String,
     required: true,
@@ -18,19 +22,11 @@ const vendorSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  accountType: {
-    type: String,
-    default: 'vendor', 
-    required: true,
-  },
   phone: {
     type: String,
     required: true,
   },
-  confirmPassword: {
-    type: String,
-    required: true,
-  },
+
   createdAt: {
     type: Date,
     default: Date.now,

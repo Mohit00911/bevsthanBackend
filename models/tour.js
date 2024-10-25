@@ -29,9 +29,16 @@ const tourDetailsSchema = new mongoose.Schema({
     groupSize: { type: Number, default: 0 },
     maxPeople: { type: Number, default: 0 },
   },
-
+  welcomeDrinks: {
+    type: Boolean
+  },
   standardDetails: {
-    price: { type: Number },
+    pricing: [
+      {
+        day: Number,
+        price: Number
+      }
+    ],
     cancellationPolicy: { type: String },
     highlights: [{ type: String }],
     whatsIncluded: [{ type: String }],
@@ -42,21 +49,54 @@ const tourDetailsSchema = new mongoose.Schema({
       {
         title: { type: String },
         duration: { type: String },
-        meals: [{ type: String }],
+        meals: {
+          breakfast: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]  // array of photo URLs
+          },
+          lunch: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]
+          },
+          dinner: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]
+          }
+        }
+        ,
         image: { type: String },
         description: { type: String },
         day: { type: Number },
         hotelName: { type: String },
         hotelUrl: { type: String },
-        siteSeenPhotos: { type: [String], default: [] } ,
+        siteSeenPhotos: { type: [String], default: [] },
+        hotelPhotos: { type: [String], default: [] },
         managerName: { type: String },
         managerImage: { type: String },
+
+        carName: { type: String },
+        carPhotos: [{ type: String }],
+        transportation: { type: Boolean },
+
+
+
+
+
+
       },
     ],
   },
 
   deluxeDetails: {
-    price: { type: Number },
+    pricing: [
+      {
+        day: Number,
+        price: Number
+      }
+    ],
     cancellationPolicy: { type: String },
     highlights: [{ type: String }],
     whatsIncluded: [{ type: String }],
@@ -67,21 +107,48 @@ const tourDetailsSchema = new mongoose.Schema({
       {
         title: { type: String },
         duration: { type: String },
-        meals: [{ type: String }],
+        meals: {
+          breakfast: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]  // array of photo URLs
+          },
+          lunch: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]
+          },
+          dinner: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]
+          }
+        }
+        ,
         image: { type: String },
         description: { type: String },
         day: { type: Number },
         hotelName: { type: String },
         hotelUrl: { type: String },
-        siteSeenPhotos: { type: [String], default: [] } ,
+        siteSeenPhotos: { type: [String], default: [] },
+        hotelPhotos: { type: [String], default: [] },
         managerName: { type: String },
         managerImage: { type: String },
+        carName: { type: String },
+        carPhotos: [{ type: String }],
+        transportation: { type: Boolean },
+
       },
     ],
   },
 
   premiumDetails: {
-    price: { type: Number },
+    pricing: [
+      {
+        day: Number,
+        price: Number
+      }
+    ],
     cancellationPolicy: { type: String },
     highlights: [{ type: String }],
     whatsIncluded: [{ type: String }],
@@ -92,15 +159,37 @@ const tourDetailsSchema = new mongoose.Schema({
       {
         title: { type: String },
         duration: { type: String },
-        meals: [{ type: String }],
+        meals: {
+          breakfast: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]  // array of photo URLs
+          },
+          lunch: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]
+          },
+          dinner: {
+            isAvailable: { type: Boolean, default: false },
+            name: { type: String, default: '' },
+            photos: [{ type: String }]
+          }
+        }
+        ,
         image: { type: String },
         description: { type: String },
         day: { type: Number },
         hotelName: { type: String },
         hotelUrl: { type: String },
-        siteSeenPhotos: { type: [String], default: [] } ,
+        siteSeenPhotos: { type: [String], default: [] },
+        hotelPhotos: { type: [String], default: [] },
         managerName: { type: String },
         managerImage: { type: String },
+        carName: { type: String },
+        carPhotos: [{ type: String }],
+        transportation: { type: Boolean },
+
       },
     ],
   },

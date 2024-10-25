@@ -10,12 +10,9 @@ const cloudinary = require('cloudinary').v2;
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-
 const createTour = async (req, res) => {
+  console.log(req.files);
   try {
-    console.log("Request Body:", req.body);
-
-    // Extracting tour data from request body
     const {
       uuid,
       name,
@@ -35,10 +32,11 @@ const createTour = async (req, res) => {
       knowBeforeYouGo,
       fixedDates,
       openHours,
+      welcomeDrinks,
     } = req.body;
 
     // Upload banner image to Cloudinary if available
-    let bannerImageUrl = null;  
+    let bannerImageUrl = null;
     if (req.files?.bannerImage) {
       const bannerImage = req.files.bannerImage[0];
       const uploadedBanner = await cloudinary.uploader.upload(bannerImage.path, {
@@ -47,15 +45,15 @@ const createTour = async (req, res) => {
       bannerImageUrl = uploadedBanner.secure_url;
     }
 
-    // Function to upload and retrieve URLs of site seen photos for itineraries
-    const uploadSiteSeenPhotos = async (photos) => {
-      if (!Array.isArray(photos)) {
-        photos = [photos]; // Wrap single file object in an array
-      }
-      
+    // Function to upload and retrieve URLs of photos
+    const uploadPhotos = async (photos) => {
       const uploadedPhotoUrls = [];
+      if (!Array.isArray(photos)) {
+        photos = [photos]; // Ensure photos is an array
+      }
+
       for (const photo of photos) {
-        if (photo && photo.path) { // Check if the photo object is valid
+        if (photo && photo.path) {
           const uploadedPhoto = await cloudinary.uploader.upload(photo.path, {
             folder: 'tours',
           });
@@ -65,15 +63,46 @@ const createTour = async (req, res) => {
       return uploadedPhotoUrls;
     };
 
-    // Process itineraries and upload photos
-    const processItineraries = async (itineraries, siteSeenPhotoFiles) => {
-      return Promise.all(itineraries.map(async (itinerary, index) => {
+    // Process itineraries and upload photos (both siteSeenPhotos and carPhotos)
+    const processItineraries = async (itineraries, siteSeenPhotoFiles, carPhotoFiles, mealPhotoFiles, hotelPhotoFiles) => {
+      return Promise.all(itineraries.map(async (itinerary) => {
         let siteSeenPhotosUrls = [];
-        
-        // If siteSeenPhotoFiles exists for the current itinerary
-        if (siteSeenPhotoFiles && siteSeenPhotoFiles[index]) {
-          const files = Array.isArray(siteSeenPhotoFiles[index]) ? siteSeenPhotoFiles[index] : [siteSeenPhotoFiles[index]];
-          siteSeenPhotosUrls = await uploadSiteSeenPhotos(files);
+        let carPhotosUrls = [];
+        let mealPhotosUrls = []; // Initialize mealPhotosUrls
+        let hotelPhotosUrls = []; // For hotel photos
+    
+        // Upload site seen photos if they exist
+        if (siteSeenPhotoFiles) {
+          const siteFiles = Array.isArray(siteSeenPhotoFiles) ? siteSeenPhotoFiles : [siteSeenPhotoFiles];
+          siteSeenPhotosUrls = await uploadPhotos(siteFiles);
+        }
+    
+        // Upload car photos if they exist
+        if (carPhotoFiles) {
+          const carFiles = Array.isArray(carPhotoFiles) ? carPhotoFiles : [carPhotoFiles];
+          carPhotosUrls = await uploadPhotos(carFiles);
+        }
+    
+        // Upload meal photos if they exist
+        if (mealPhotoFiles) {
+          for (const category of Object.keys(mealPhotoFiles)) {
+            for (const mealType of Object.keys(mealPhotoFiles[category])) {
+              const mealFiles = Array.isArray(mealPhotoFiles[category][mealType]) 
+                               ? mealPhotoFiles[category][mealType] 
+                               : [mealPhotoFiles[category][mealType]];
+              const mealPhotos = await uploadPhotos(mealFiles); // Upload meal photos
+              mealPhotosUrls.push({
+                type: mealType,
+                photos: mealPhotos,
+              });
+            }
+          }
+        }
+    
+        // Upload hotel photos if they exist
+        if (hotelPhotoFiles) {
+          const hotelFiles = Array.isArray(hotelPhotoFiles) ? hotelPhotoFiles : [hotelPhotoFiles];
+          hotelPhotosUrls = await uploadPhotos(hotelFiles);
         }
     
         return {
@@ -82,10 +111,20 @@ const createTour = async (req, res) => {
             ...(Array.isArray(itinerary.siteSeenPhotos) ? itinerary.siteSeenPhotos : []),
             ...siteSeenPhotosUrls
           ].filter(url => typeof url === 'string' && url.trim() !== ''),
+          carName: itinerary.carName || "", // Include carName from itinerary
+          carPhotos: [
+            ...(Array.isArray(itinerary.carPhotos) ? itinerary.carPhotos : []),
+            ...carPhotosUrls // Ensure all uploaded car photos are added
+          ].filter(url => typeof url === 'string' && url.trim() !== ''),
+          meals: mealPhotosUrls, // Include the processed meal photos
+          hotelPhotos: [
+            ...(Array.isArray(itinerary.hotelPhotos) ? itinerary.hotelPhotos : []),
+            ...hotelPhotosUrls // Ensure all uploaded hotel photos are added
+          ].filter(url => typeof url === 'string' && url.trim() !== ''),
         };
       }));
     };
-    
+    // Handle general tour image uploads
     let imageUrls = [];
     if (req.files?.images) {
       const photos = req.files.images;
@@ -96,23 +135,46 @@ const createTour = async (req, res) => {
         imageUrls.push(uploadedPhoto.secure_url);
       }
     }
+    const processTourItineraries = async (itineraries, siteSeenPhotos, carPhotos, mealPhotos, hotelPhotos) => {
+      return await processItineraries(itineraries, siteSeenPhotos, carPhotos, mealPhotos, hotelPhotos);
+    };
 
+    // Parse itineraries for standard, deluxe, and premium tours
     let standardItineraries = JSON.parse(standardDetails)?.itineraries || [];
     let deluxeItineraries = JSON.parse(deluxeDetails)?.itineraries || [];
     let premiumItineraries = JSON.parse(premiumDetails)?.itineraries || [];
 
-    if (req.files?.standardSiteSeenPhotos) {
-      standardItineraries = await processItineraries(standardItineraries, req.files.standardSiteSeenPhotos);
+    if (req.files?.standardSiteSeenPhotos || req.files?.standardCarPhotos || req.files?.standardMealsPhotos || req.files?.standardHotelPhotos) {
+      standardItineraries = await processTourItineraries(
+        standardItineraries,
+        req.files.standardSiteSeenPhotos,
+        req.files.standardCarPhotos,
+        req.files?.standardMealsPhotos,
+        req.files?.standardHotelPhotos // Include hotel photos
+      );
     }
 
-    if (req.files?.deluxeSiteSeenPhotos) {
-      deluxeItineraries = await processItineraries(deluxeItineraries, req.files.deluxeSiteSeenPhotos);
+    if (req.files?.deluxeSiteSeenPhotos || req.files?.deluxeCarPhotos || req.files?.deluxeMealsPhotos || req.files?.deluxeHotelPhotos) {
+      deluxeItineraries = await processTourItineraries(
+        deluxeItineraries,
+        req.files.deluxeSiteSeenPhotos,
+        req.files.deluxeCarPhotos,
+        req.files?.deluxeMealsPhotos,
+        req.files?.deluxeHotelPhotos // Include hotel photos
+      );
     }
 
-    if (req.files?.premiumSiteSeenPhotos) {
-      premiumItineraries = await processItineraries(premiumItineraries, req.files.premiumSiteSeenPhotos);
+    if (req.files?.premiumSiteSeenPhotos || req.files?.premiumCarPhotos || req.files?.premiumMealsPhotos || req.files?.premiumHotelPhotos) {
+      premiumItineraries = await processTourItineraries(
+        premiumItineraries,
+        req.files.premiumSiteSeenPhotos,
+        req.files.premiumCarPhotos,
+        req.files?.premiumMealsPhotos,
+        req.files?.premiumHotelPhotos // Include hotel photos
+      );
     }
 
+    // Construct updated details objects
     const updatedStandardDetails = {
       ...JSON.parse(standardDetails),
       itineraries: standardItineraries,
@@ -127,12 +189,18 @@ const createTour = async (req, res) => {
       ...JSON.parse(premiumDetails),
       itineraries: premiumItineraries,
     };
-   
+
+    // Add pricing directly to updated details
+    updatedStandardDetails.pricing = JSON.parse(standardDetails).pricing;
+    updatedDeluxeDetails.pricing = JSON.parse(deluxeDetails).pricing;
+    updatedPremiumDetails.pricing = JSON.parse(premiumDetails).pricing;
+
+    console.log(updatedStandardDetails);
     // Check if the tour already exists using the UUID
     let tour = await Tour.findOne({ uuid });
 
     if (tour) {
-      // If the tour exists, update the existing tour
+      // Update the existing tour
       tour.name = name;
       tour.overview = overview;
       tour.location = location;
@@ -144,19 +212,20 @@ const createTour = async (req, res) => {
       tour.languages = Array.isArray(languages) ? languages : [languages];
       tour.departureDetails = departureDetails;
       tour.additionalInfo = Array.isArray(additionalInfo) ? additionalInfo : [additionalInfo];
-      tour.bannerImage = bannerImageUrl || tour.bannerImage; // Only update if a new image is uploaded
-      tour.images = imageUrls.length > 0 ? imageUrls : tour.images; // Update images only if new ones are provided
+      tour.bannerImage = bannerImageUrl || tour.bannerImage;
+      tour.images = imageUrls.length > 0 ? imageUrls : tour.images;
       tour.standardDetails = updatedStandardDetails;
       tour.deluxeDetails = updatedDeluxeDetails;
       tour.premiumDetails = updatedPremiumDetails;
       tour.knowBeforeYouGo = Array.isArray(knowBeforeYouGo) ? knowBeforeYouGo : [knowBeforeYouGo];
       tour.fixedDates = fixedDates;
       tour.openHours = openHours;
+      tour.welcomeDrinks = welcomeDrinks;
 
       const updatedTour = await tour.save(); // Save the updated tour
       return res.status(200).json(updatedTour);
     } else {
-      // Create a new tour if it does not exist
+      // Create a new tour
       const newTour = new Tour({
         uuid,
         name,
@@ -170,29 +239,30 @@ const createTour = async (req, res) => {
         languages: Array.isArray(languages) ? languages : [languages],
         departureDetails,
         additionalInfo: Array.isArray(additionalInfo) ? additionalInfo : [additionalInfo],
-        bannerImage: bannerImageUrl,
-        images: imageUrls,
+        bannerImage: bannerImageUrl || null,
+        images: imageUrls.length > 0 ? imageUrls : [],
         standardDetails: updatedStandardDetails,
         deluxeDetails: updatedDeluxeDetails,
         premiumDetails: updatedPremiumDetails,
         knowBeforeYouGo: Array.isArray(knowBeforeYouGo) ? knowBeforeYouGo : [knowBeforeYouGo],
-        fixedDates: fixedDates,
-        openHours: openHours,
+        fixedDates,
+        openHours,
+        welcomeDrinks,
       });
-
-      const savedTour = await newTour.save(); // Save the new tour
-      return res.status(201).json(savedTour);
+      const createdTour = await newTour.save();
+      return res.status(201).json(createdTour);
     }
   } catch (error) {
-    console.error('Error creating/updating tour:', error);
-    res.status(500).json({ error: 'Internal Server Error', details: error });
+    console.error('Error creating tour:', error);
+    return res.status(500).json({ error: 'An error occurred while creating the tour.' });
   }
 };
+
 
 const deleteTour = async (req, res) => {
   try {
     const { uuid } = req.params; // Get UUID from request parameters
-console.log(uuid)
+    console.log(uuid)
     // Check if the tour exists
     const deletedTour = await Tour.findOneAndDelete({ uuid });
 
@@ -212,13 +282,13 @@ console.log(uuid)
 const getAllTours = async (req, res) => {
   try {
     const { location, tourType, minPrice, maxPrice, durations } = req.body;
-// console.log(location) 
+    // console.log(location) 
     const tours = await Tour.find();
     const filteredTours = tours.filter((tour) => tour.status !== "disabled");
 
     let filteredToursByLocationAndName = filteredTours;
     if (location) {
-    
+
       filteredToursByLocationAndName = filteredTours.filter((tour) => {
         const tourLocation = tour.location && tour.location.toLowerCase();
         // console.log(tourLocation)
@@ -242,10 +312,10 @@ const getAllTours = async (req, res) => {
         });
       });
     }
-    
+
 
     let filteredToursByPrice = filteredToursByType;
-    if (minPrice && maxPrice ) {
+    if (minPrice && maxPrice) {
       filteredToursByPrice = filteredToursByType.filter((tour) => {
         const tourPrice = parseFloat(tour.cost[0].standardPrice);
         return (
@@ -253,7 +323,7 @@ const getAllTours = async (req, res) => {
         );
       });
     }
- 
+
     let filteredToursByDuration = filteredToursByPrice;
     if (durations && durations.length > 0) {
       filteredToursByDuration = filteredToursByPrice.filter((tour) => {
@@ -287,12 +357,13 @@ const getToursForVendor = async (req, res) => {
 };
 const getTourDetails = async (req, res) => {
   try {
+    console.log("params", req.params)
     const tourId = req.params.tourId;
- e
+
     const tours = await Tour.find({ uuid: tourId });
-   
-    res.status(200).json(tours) 
-  
+
+    res.status(200).json(tours)
+
   } catch (error) {
     console.error("Error fetching vendor tours:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -310,7 +381,7 @@ const updateTour = async (req, res) => {
         return res.status(404).json({ error: "Tour not found" });
       }
 
-    
+
       existingTour.reviews.push(req.body);
 
       const updatedTour = await existingTour.save();
@@ -389,12 +460,12 @@ const getToursByFilter = async (req, res) => {
     const filteredToursByDuration = filteredToursByPrice.filter((tour) => {
       const tourDurationNumbers = tour.duration.match(/\d+/g);
       const tourDurationNumber = tourDurationNumbers ? parseInt(tourDurationNumbers.join(""), 10) : 0;
-  
+
       return durations.every((duration) => {
-          return tourDurationNumber >= duration;
+        return tourDurationNumber >= duration;
       });
-  })
-  
+    })
+
 
     res.json(filteredToursByDuration);
   } catch (error) {

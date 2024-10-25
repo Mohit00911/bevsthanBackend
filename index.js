@@ -3,16 +3,16 @@ const app = express();
 const bodyParser = require('body-parser');
 const multer = require('multer');
 
-const wishlist=require('./controllers/wishlist.js')
+const wishlist = require('./controllers/wishlist.js')
 const authRouter = require('./controllers/auth.js');
-const tourController=require('./controllers/tour.js')
-const categegories=require('./controllers/categories.js')
-const attributes=require('./controllers/attributes.js')
+const tourController = require('./controllers/tour.js')
+const categegories = require('./controllers/categories.js')
+const attributes = require('./controllers/attributes.js')
 // const imageUploader=require('./controllers/tour.js')
-const imageUploader=require('./controllers/cloudinary.js')
-const testimonials=require('./controllers/testimonials.js')
-const contactUs=require('./controllers/contactUs.js')
-const paymentController=require('./services/paymentService.js'
+const imageUploader = require('./controllers/cloudinary.js')
+const testimonials = require('./controllers/testimonials.js')
+const contactUs = require('./controllers/contactUs.js')
+const paymentController = require('./services/paymentService.js'
 )
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
@@ -31,7 +31,7 @@ cloudinary.config({
 });
 
 
-mongoose.connect(uri, { });
+mongoose.connect(uri, {});
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -62,20 +62,36 @@ app.use(cors());
 app.use(bodyParser.json());
 app.post('/user/signup', authRouter.signup);
 app.post('/user/login', authRouter.login);
-app.post('/expert/signup', authRouter.signup);
-app.post('/expert/login', authRouter.login);
-app.post('/api/createTours',upload.fields([
+app.post('/expert/signup', authRouter.vendorSignup);
+app.post('/expert/login', authRouter.vendorLogin);
+app.post('/api/createTours', upload.fields([
   { name: 'bannerImage', maxCount: 1 },  // Single file upload for banner image
-  { name: 'images', maxCount: 10 }     ,
+  { name: 'images', maxCount: 10 },
   { name: 'standardSiteSeenPhotos', maxCount: 10 },   // Multiple file upload for photos
   { name: 'deluxeSiteSeenPhotos', maxCount: 10 },
-  { name: 'premiumSiteSeenPhotos', maxCount: 10 }
+  { name: 'premiumSiteSeenPhotos', maxCount: 10 },
+
+
+  { name: "standardCarPhotos", maxCount: 50 },
+  { name: "deluxeCarPhotos", maxCount: 50 },
+  { name: "premiumCarPhotos", maxCount: 50 },
+
+
+  { name: "premiumMealsPhotos", maxCount: 50 },
+  { name: "standardMealsPhotos", maxCount: 50 },
+  { name: "deluxeMealsPhotos", maxCount: 50 },
+  { name: "standardHotelPhotos", maxCount: 50 },
+  { name: "deluxeHotelPhotos", maxCount: 50 },
+  { name: "premiumHotelPhotos", maxCount: 50 },
+
+
+
 ]), tourController.createTour);
 app.delete('/api/deleteTour/:uuid', tourController.deleteTour);
 
 
-app.post('/api/updateUser',authRouter.updateUser)
-app.post('/api/getUser',authRouter.getUser)
+app.post('/api/updateUser', authRouter.updateUser)
+app.post('/api/getUser', authRouter.getUser)
 app.post('/api/contactus', contactUs.submitContactForm);
 app.post('/api/allTours', tourController.getAllTours);
 app.post('/api/checkout', paymentController.checkout);
@@ -92,7 +108,7 @@ app.post('/api/createTestimonial', testimonials.createTestimonial);
 app.post('/api/vendorTours', tourController.getToursForVendor);
 app.post('/api/updateTour/:tourId', tourController.updateTour);
 app.get('/api/getTour/:tourId', tourController.getTourDetails);
-app.get('/api/getkey',(req,res)=>res.status(200).json("rzp_test_51M4AB2hSU08Ih"))
+app.get('/api/getkey', (req, res) => res.status(200).json("rzp_test_51M4AB2hSU08Ih"))
 app.post('/uploadImage', imageUploader.imageUpload);
 app.post('/api/addToWishlist', wishlist.addToWishlist);
 app.get('/api/wishlist/:userId', wishlist.getWishlist);
@@ -107,7 +123,7 @@ app.post('/api/attributes/:id/sub-attributes', attributes.addSubAttribute)
 app.delete('/api/attributes/:attributeId/sub-attributes/:subAttributeId', attributes.deleteSubattribute)
 app.delete('/api/attributes/:id', attributes.deleteAttribute)
 
-app.get('/', (req, res) => { 
+app.get('/', (req, res) => {
   res.send('Hello, Express with MongoDB!');
 });
 
